@@ -1,18 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.voiceapp.assistant">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- صلاحية الإنترنت (مطلوبة للروابط الخارجية وتحميل أصوات TTS عالية الجودة) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
 
     <!-- هام جداً لأندرويد 11 فما فوق (API 30+): تمكين التطبيق من رؤية محركات النطق TTS على الجهاز -->
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
-
     </queries>
 
     <application
