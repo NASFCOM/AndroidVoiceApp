@@ -95,23 +95,34 @@
   </div>
 
   <script>
-    // الدالة السحرية للنطق: تعمل في أندرويد وفي متصفح كروم
+    window.onAndroidTTSReady = function () {
+      window.__androidTtsReady = true;
+    };
+
     function speakText(text, onEnd) {
       if (!text) return;
 
-      // 1. إذا كان التطبيق يعمل داخل أندرويد (تطبيقك المثبت عبر الجسر الأصلي)
       if (window.AndroidTTS && typeof window.AndroidTTS.speak === 'function') {
+        const isReady = (typeof window.AndroidTTS.isReady === 'function')
+          ? window.AndroidTTS.isReady()
+          : true;
+
+        if (!isReady) {
+          setTimeout(() => speakText(text, onEnd), 500);
+          return;
+        }
+
         window.AndroidTTS.speak(text);
-        if (onEnd) setTimeout(onEnd, 3500); // محاكاة الانتقال
+        if (onEnd) setTimeout(onEnd, 3500);
         return;
       }
 
-      // 2. إذا كان يعمل داخل المتصفح العادي
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ar-SA';
         utterance.rate = 1.0;
+        utterance.pitch = 1.1;
         if (onEnd) utterance.onend = onEnd;
         window.speechSynthesis.speak(utterance);
       }
@@ -136,7 +147,7 @@
       const el = document.getElementById(id);
       if (!el) return;
       el.classList.add('active');
-      const text = el.querySelector('h2 span').innerText + ": " + el.querySelector('p').innerText;
+      const text = el.querySelector('h2 span').innerText + ': ' + el.querySelector('p').innerText;
       speakText(text, () => el.classList.remove('active'));
     }
 
@@ -152,8 +163,12 @@
         clearHighlights();
         const currentId = ids[index];
         const el = document.getElementById(currentId);
+        if (!el) {
+          clearHighlights();
+          return;
+        }
         el.classList.add('active');
-        const text = el.querySelector('h2 span').innerText + ": " + el.querySelector('p').innerText;
+        const text = el.querySelector('h2 span').innerText + ': ' + el.querySelector('p').innerText;
         index++;
         speakText(text, next);
       }
