@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تطبيقي مع المساعد الصوتي</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; padding: 16px; min-height: 100vh; }
+    header { text-align: center; margin-bottom: 24px; padding: 16px; background: #1e293b; border-radius: 16px; border: 1px solid #334155; }
+    h1 { font-size: 20px; color: #38bdf8; margin-bottom: 6px; }
+    p.subtitle { font-size: 13px; color: #94a3b8; }
+    
+    .section-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 14px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+    .section-card:hover, .section-card.active {
+      border-color: #6366f1;
+      background: #272744;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px -4px rgba(99, 102, 241, 0.3);
+    }
+    .section-card h2 { font-size: 16px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; }
+    .badge { font-size: 11px; background: #334155; padding: 2px 8px; border-radius: 99px; color: #cbd5e1; }
+    .section-card p { font-size: 13px; color: #cbd5e1; line-height: 1.5; }
+    .read-hint { font-size: 11px; color: #818cf8; margin-top: 10px; display: block; font-weight: bold; }
+    
+    .controls { display: flex; gap: 8px; margin-bottom: 16px; }
+    button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      background: #4f46e5;
+      color: white;
+      font-weight: bold;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    button.stop-btn { background: #e11d48; }
+    button:active { transform: scale(0.98); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>المساعد الصوتي للشاشة</h1>
+    <p class="subtitle">اضغط على أي قسم للاستماع إليه فوراً، أو اضغط زر قراءة الكل</p>
+  </header>
+
+  <div class="controls">
+    <button onclick="readAllSections()">▶ قراءة كل الأقسام بالتتابع</button>
+    <button class="stop-btn" onclick="stopSpeaking()">⏹ إيقاف الصوت</button>
+  </div>
+
+  <!-- القسم الأول -->
+  <div class="section-card" id="sec-1" onclick="readSingle('sec-1')">
+    <h2>
+      <span>1. الأخبار والتحديثات</span>
+      <span class="badge">جديد</span>
+    </h2>
+    <p>تم إطلاق التحديث الجديد اليوم مع تحسينات كبيرة في سرعة استجابة التطبيق ودعم النطق الصوتي باللغة العربية.</p>
+    <span class="read-hint">اضغط هنا للاستماع لهذا القسم</span>
+  </div>
+
+  <!-- القسم الثاني -->
+  <div class="section-card" id="sec-2" onclick="readSingle('sec-2')">
+    <h2>
+      <span>2. الإحصائيات والرصيد</span>
+      <span class="badge">مالي</span>
+    </h2>
+    <p>رصيدك الحالي هو خمسمائة دولار، وهناك عمليتان مكتملتان بنجاح دون أي مستحقات متأخرة.</p>
+    <span class="read-hint">اضغط هنا للاستماع لهذا القسم</span>
+  </div>
+
+  <!-- القسم الثالث -->
+  <div class="section-card" id="sec-3" onclick="readSingle('sec-3')">
+    <h2>
+      <span>3. التنبيهات وإشعار الأمان</span>
+      <span class="badge">أمان</span>
+    </h2>
+    <p>تم تفعيل المصادقة الثنائية بنجاح. حسابك محمي بالكامل ومحدث لآخر إصدار.</p>
+    <span class="read-hint">اضغط هنا للاستماع لهذا القسم</span>
+  </div>
+
+  <script>
+    // الدالة السحرية للنطق: تعمل في أندرويد وفي متصفح كروم
+    function speakText(text, onEnd) {
+      if (!text) return;
+
+      // 1. إذا كان التطبيق يعمل داخل أندرويد (تطبيقك المثبت عبر الجسر الأصلي)
+      if (window.AndroidTTS && typeof window.AndroidTTS.speak === 'function') {
+        window.AndroidTTS.speak(text);
+        if (onEnd) setTimeout(onEnd, 3500); // محاكاة الانتقال
+        return;
+      }
+
+      // 2. إذا كان يعمل داخل المتصفح العادي
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ar-SA';
+        utterance.rate = 1.0;
+        if (onEnd) utterance.onend = onEnd;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    function stopSpeaking() {
+      if (window.AndroidTTS && typeof window.AndroidTTS.stop === 'function') {
+        window.AndroidTTS.stop();
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      clearHighlights();
+    }
+
+    function clearHighlights() {
+      document.querySelectorAll('.section-card').forEach(el => el.classList.remove('active'));
+    }
+
+    function readSingle(id) {
+      clearHighlights();
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add('active');
+      const text = el.querySelector('h2 span').innerText + ": " + el.querySelector('p').innerText;
+      speakText(text, () => el.classList.remove('active'));
+    }
+
+    function readAllSections() {
+      const ids = ['sec-1', 'sec-2', 'sec-3'];
+      let index = 0;
+
+      function next() {
+        if (index >= ids.length) {
+          clearHighlights();
+          return;
+        }
+        clearHighlights();
+        const currentId = ids[index];
+        const el = document.getElementById(currentId);
+        el.classList.add('active');
+        const text = el.querySelector('h2 span').innerText + ": " + el.querySelector('p').innerText;
+        index++;
+        speakText(text, next);
+      }
+
+      next();
+    }
+  </script>
+</body>
+</html>
