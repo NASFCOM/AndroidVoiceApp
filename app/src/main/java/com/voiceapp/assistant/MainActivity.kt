@@ -29,40 +29,25 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. تهيئة محرك تحويل النص إلى كلام (TTS) الخاص بنظام أندرويد
         textToSpeech = TextToSpeech(this, this)
-
-        // 2. إعداد الـ WebView
         setupWebView()
-
-        // 3. التحقق من صلاحيات الميكروفون إذا تم استخدام الاستماع الصوتي
-        // لم يتم تفعيل الاستماع بالميكروفون
     }
 
     private fun setupWebView() {
         webView = findViewById(R.id.myWebView)
         val settings = webView.settings
 
-        // تفعيل جافاسكريبت (أساسي لتشغيل كود المساعد الخاص بك)
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
-        
-        // السماح بالوصول لملفات التطبيق المحلية (assets)
         settings.allowFileAccess = true
         settings.allowContentAccess = true
-
-        // إيقاف شرط تفاعل المستخدم لتشغيل الصوت (هام جداً لقراءة المحتوى تلقائياً)
         settings.mediaPlaybackRequiresUserGesture = false
 
-        // 4. السحر هنا: ربط جسر أندرويد الأصلي بصفحة الويب باسم "AndroidTTS"
-        // هذا يسمح لملف الـ HTML باستدعاء نطق أندرويد مباشرة!
         webView.addJavascriptInterface(WebAppInterface(this), "AndroidTTS")
 
-        // 5. ضبط WebChromeClient لمنح أذونات الميكروفون والكاميرا إن وجدت
         webView.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest?) {
-                // منح الإذن لصفحة الويب تلقائياً عند طلبها
                 request?.let {
                     runOnUiThread {
                         it.grant(it.resources)
@@ -76,53 +61,79 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }
 
-        // إبقاء التنقل داخل الـ WebView بدلاً من فتح المتصفح الخارجي
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                // إشعار صفحة HTML بأن جسر الأندرويد جاهز للاستخدام
                 webView.evaluateJavascript("if(window.onAndroidTTSReady) { window.onAndroidTTSReady(); }", null)
             }
         }
 
-        // تحميل ملف HTML الخاص بك
         webView.loadUrl("file:///android_asset/index.html")
     }
 
-    // تهيئة محرك النطق عند جاهزيته
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            val result = textToSpeech?.setLanguage(Locale("ar"))
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                Log.e("TTS", "اللغة غير مدعومة في محرك TTS الحالي للجهاز")
-            } else {
-                isTtsReady = true
-                Log.d("TTS", "محرك النطق في أندرويد جاهز للعمل بنجاح!")
-            }
-        } else {
+        if (status != TextToSpeech.SUCCESS) {
             Log.e("TTS", "فشل تهيئة TextToSpeech")
+            isTtsReady = false
+            return
+        }
+
+        val preferredLocales = listOf(
+            Locale("ar", "SA"),
+            Locale("ar", "EG"),
+            Locale("ar"),
+            Locale.US,
+            Locale.ENGLISH
+        )
+
+        var selectedLocale: Locale? = null
+
+        for (locale in preferredLocales) {
+            val result = textToSpeech?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
+            if (result == TextToSpeech.LANG_AVAILABLE || result == TextToSpeech.LANG_COUNTRY_AVAILABLE) {
+                selectedLocale = locale
+                break
+            }
+        }
+
+        if (selectedLocale == null) {
+            Log.e("TTS", "لا توجد لغة مدعومة على هذا الجهاز")
+            isTtsReady = false
+            return
+        }
+
+        val languageResult = textToSpeech?.setLanguage(selectedLocale)
+        if (languageResult == TextToSpeech.LANG_MISSING_DATA || languageResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+            Log.e("TTS", "اللغة المختارة غير مدعومة على هذا الجهاز: $selectedLocale")
+            isTtsReady = false
+        } else {
+            textToSpeech?.setSpeechRate(1.0f)
+            textToSpeech?.setPitch(1.0f)
+            isTtsReady = true
+            Log.d("TTS", "تم تجهيز TextToSpeech بنجاح: $selectedLocale")
         }
     }
 
-    // فئة الجسر بين الجافاسكريبت ونظام أندرويد
     inner class WebAppInterface(private val context: Context) {
 
-        /**
-         * دالة نطق النص - تستدعيها صفحة الويب عبر: AndroidTTS.speak("النص المطلوب")
-         */
         @JavascriptInterface
         fun speak(text: String?) {
-            if (!text.isNullOrEmpty() && isTtsReady) {
-                runOnUiThread {
-                    // QUEUE_FLUSH يوقف أي كلام سابق ويبدأ قراءة النص الجديد فوراً
-                    textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "utteranceId_${System.currentTimeMillis()}")
+            if (text.isNullOrBlank()) return
+
+            if (!isTtsReady) {
+                Log.e("TTS", "TextToSpeech غير جاهز. النص لم يقرأ: $text")
+                return
+            }
+
+            runOnUiThread {
+                val utteranceId = "utteranceId_${System.currentTimeMillis()}"
+                val params = Bundle().apply {
+                    putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
                 }
+                textToSpeech?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
             }
         }
 
-        /**
-         * دالة إيقاف القراءة فوراً
-         */
         @JavascriptInterface
         fun stop() {
             runOnUiThread {
@@ -130,27 +141,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }
 
-        /**
-         * فحص هل المحرك جاهز أم لا
-         */
         @JavascriptInterface
         fun isReady(): Boolean {
             return isTtsReady
         }
 
-        /**
-         * إظهار رسالة سريعة في أندرويد للتأكد من الاتصال
-         */
         @JavascriptInterface
         fun showToast(message: String) {
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
 
-    
-
     override fun onDestroy() {
-        // تحرير الذاكرة وإيقاف النطق عند إغلاق التطبيق
         textToSpeech?.stop()
         textToSpeech?.shutdown()
         super.onDestroy()
